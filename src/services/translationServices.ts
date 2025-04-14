@@ -8,12 +8,12 @@ export const deeplServices: TranslationService[] = [
     id: "deepl-free", 
     name: "DeepL API Free", 
     description: "High quality translation, limited languages", 
-    provider: "deepl" // This is now explicitly typed as "deepl", which is a valid TranslationServiceType
+    provider: "deepl" 
   }
 ];
 
 // Export all available services
 export const allTranslationServices: TranslationService[] = [
-  ...geminiModels,
-  ...deeplServices
+  ...deeplServices,  // Put DeepL first to make it the default
+  ...geminiModels
 ];

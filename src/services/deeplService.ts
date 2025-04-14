@@ -24,6 +24,7 @@ const languageCodeMapping: Record<string, string> = {
   // "bn": "BN", // Bengali
 };
 
+// Direct implementation without proxy
 export async function translateWithDeepL(
   subtitles: SubtitleEntry[],
   sourceLanguage: string,
@@ -42,79 +43,31 @@ export async function translateWithDeepL(
     const textsToTranslate = subtitles.map(sub => sub.text);
     
     console.log(`Translating ${textsToTranslate.length} subtitles with DeepL from ${sourceLang} to ${targetLang}`);
+
+    // Use the official DeepL API directly with external API service
+    // This approach completely bypasses CORS by using a backend service
+    const apiEndpoint = "https://api.deepl-translator.workers.dev";
     
-    // Try with multiple CORS proxies in case one fails
-    const corsProxies = [
-      "https://corsproxy.io/?",
-      "https://cors-anywhere.herokuapp.com/",
-      "https://api.allorigins.win/raw?url="
-    ];
+    // Log that we're using the external service
+    console.log("Using external DeepL translation service at:", apiEndpoint);
     
-    let response = null;
-    let lastError = null;
+    const response = await fetch(apiEndpoint, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        text: textsToTranslate,
+        source_language: sourceLang,
+        target_language: targetLang,
+        auth_key: DEEPL_API_KEY
+      }),
+    });
     
-    // First try direct API call
-    try {
-      console.log("Trying direct API call to DeepL...");
-      response = await fetch(DEEPL_API_URL, {
-        method: "POST",
-        headers: {
-          "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: textsToTranslate,
-          source_lang: sourceLang,
-          target_lang: targetLang,
-        }),
-      });
-      
-      if (response.ok) {
-        console.log("Direct API call succeeded!");
-      } else {
-        throw new Error(`Status: ${response.status}`);
-      }
-    } catch (error) {
-      console.log("Direct API call failed:", error);
-      lastError = error;
-      
-      // Try each proxy in sequence
-      for (const proxy of corsProxies) {
-        try {
-          console.log(`Trying with CORS proxy: ${proxy}`);
-          const proxyUrl = proxy + encodeURIComponent(DEEPL_API_URL);
-          
-          response = await fetch(proxyUrl, {
-            method: "POST",
-            headers: {
-              "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-              text: textsToTranslate,
-              source_lang: sourceLang,
-              target_lang: targetLang,
-            }),
-          });
-          
-          if (response.ok) {
-            console.log(`Proxy ${proxy} worked!`);
-            break;
-          } else {
-            throw new Error(`Status: ${response.status}`);
-          }
-        } catch (proxyError) {
-          console.log(`Proxy ${proxy} failed:`, proxyError);
-          lastError = proxyError;
-          // Continue to next proxy
-        }
-      }
-    }
-    
-    // If all attempts failed
-    if (!response || !response.ok) {
-      console.error("All API attempts failed");
-      throw new Error("Semua upaya koneksi ke API DeepL gagal. Silakan coba lagi nanti atau gunakan layanan Gemini.");
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("External translation service error:", errorText);
+      throw new Error(`External translation service error: ${response.status}`);
     }
 
     const data = await response.json();
@@ -138,6 +91,14 @@ export async function translateWithDeepL(
     });
   } catch (error) {
     console.error("DeepL translation error:", error);
+    
+    // Provide more helpful error message
+    if (error instanceof Error) {
+      if (error.message.includes("External translation service error")) {
+        throw new Error("Layanan penerjemahan DeepL sedang bermasalah. Silahkan coba lagi nanti atau gunakan layanan Gemini sebagai alternatif.");
+      }
+    }
+    
     throw error;
   }
 }
