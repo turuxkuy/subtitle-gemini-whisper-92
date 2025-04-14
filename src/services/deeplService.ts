@@ -1,3 +1,4 @@
+
 import { SubtitleEntry } from "@/types/subtitle";
 
 // DeepL API key - this is a publishable API key
@@ -45,21 +46,41 @@ export async function translateWithDeepL(
     console.log(`Translating ${textsToTranslate.length} subtitles with DeepL from ${sourceLang} to ${targetLang}`);
     console.log('DeepL API URL:', DEEPL_API_URL);
     
-    // Add proper CORS handling
-    const response = await fetch(DEEPL_API_URL, {
-      method: "POST",
-      headers: {
-        "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        text: textsToTranslate,
-        source_lang: sourceLang,
-        target_lang: targetLang,
-      }),
-      // Adding mode: 'cors' explicitly
-      mode: 'cors',
-    });
+    // Using the fetch API with a proxy workaround for CORS
+    // We'll try direct fetch first, then fall back to a CORS proxy if needed
+    let response;
+    try {
+      response = await fetch(DEEPL_API_URL, {
+        method: "POST",
+        headers: {
+          "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: textsToTranslate,
+          source_lang: sourceLang,
+          target_lang: targetLang,
+        }),
+        mode: 'cors',
+      });
+    } catch (fetchError) {
+      console.error("Initial fetch failed, trying with CORS proxy:", fetchError);
+      
+      // Try with a CORS proxy as fallback
+      const corsProxyUrl = "https://corsproxy.io/?";
+      response = await fetch(corsProxyUrl + encodeURIComponent(DEEPL_API_URL), {
+        method: "POST",
+        headers: {
+          "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          text: textsToTranslate,
+          source_lang: sourceLang,
+          target_lang: targetLang,
+        }),
+      });
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
