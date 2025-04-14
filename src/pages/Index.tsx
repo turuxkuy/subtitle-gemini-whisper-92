@@ -5,16 +5,18 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import FileUploader from "@/components/FileUploader";
 import LanguageSelector from "@/components/LanguageSelector";
 import TranslationResult from "@/components/TranslationResult";
-import { SubtitleEntry } from "@/types/subtitle";
+import { SubtitleEntry, TranslationServiceType } from "@/types/subtitle";
 import { parseSRT, createSRTContent } from "@/utils/srtParser";
-import { translateSubtitles, geminiModels } from "@/services/geminiService";
+import { translateSubtitles } from "@/services/geminiService";
+import { translateWithDeepL } from "@/services/deeplService";
+import { allTranslationServices } from "@/services/translationServices";
 import { toast } from "sonner";
 
 const Index = () => {
   const [file, setFile] = useState<File | null>(null);
   const [sourceLanguage, setSourceLanguage] = useState("id");
   const [targetLanguage, setTargetLanguage] = useState("en");
-  const [selectedModel, setSelectedModel] = useState(geminiModels[0].id);
+  const [selectedService, setSelectedService] = useState(allTranslationServices[0].id);
   const [originalSubtitles, setOriginalSubtitles] = useState<SubtitleEntry[]>([]);
   const [translatedSubtitles, setTranslatedSubtitles] = useState<SubtitleEntry[]>([]);
   const [isTranslating, setIsTranslating] = useState(false);
@@ -57,8 +59,23 @@ const Index = () => {
     setIsTranslating(true);
 
     try {
-      console.log(`Menerjemahkan dari ${sourceLanguage} ke ${targetLanguage} menggunakan model ${selectedModel}...`);
-      const translated = await translateSubtitles(originalSubtitles, sourceLanguage, targetLanguage, selectedModel);
+      // Get the service provider type
+      const serviceInfo = allTranslationServices.find(s => s.id === selectedService);
+      if (!serviceInfo) {
+        throw new Error("Layanan terjemahan tidak valid");
+      }
+      
+      let translated: SubtitleEntry[];
+      
+      // Choose the appropriate translation service
+      if (serviceInfo.provider === "deepl") {
+        console.log(`Menerjemahkan dengan DeepL dari ${sourceLanguage} ke ${targetLanguage}`);
+        translated = await translateWithDeepL(originalSubtitles, sourceLanguage, targetLanguage);
+      } else {
+        console.log(`Menerjemahkan dengan Gemini dari ${sourceLanguage} ke ${targetLanguage} menggunakan model ${selectedService}`);
+        translated = await translateSubtitles(originalSubtitles, sourceLanguage, targetLanguage, selectedService);
+      }
+      
       setTranslatedSubtitles(translated);
       toast.success(`Terjemahan berhasil: ${translated.length} baris subtitle`);
     } catch (error) {
@@ -118,20 +135,20 @@ const Index = () => {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Languages size={20} />
-                <span>Pilih Bahasa dan Model</span>
+                <span>Pilih Bahasa dan Layanan</span>
               </CardTitle>
               <CardDescription>
-                Pilih bahasa asal, bahasa tujuan, dan model AI untuk terjemahan
+                Pilih bahasa asal, bahasa tujuan, dan layanan terjemahan
               </CardDescription>
             </CardHeader>
             <CardContent>
               <LanguageSelector 
                 selectedSourceLanguage={sourceLanguage}
                 selectedTargetLanguage={targetLanguage}
-                selectedModel={selectedModel}
+                selectedService={selectedService}
                 onSourceLanguageChange={setSourceLanguage}
                 onTargetLanguageChange={setTargetLanguage}
-                onModelChange={setSelectedModel}
+                onServiceChange={setSelectedService}
                 onTranslate={handleTranslate}
                 isTranslating={isTranslating}
                 disableTranslate={originalSubtitles.length === 0}

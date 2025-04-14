@@ -1,25 +1,17 @@
 
-import { useState } from "react";
-import { Check, ChevronsUpDown, Globe, Sparkles } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
-import { 
-  Select, 
-  SelectContent, 
-  SelectItem, 
-  SelectTrigger, 
-  SelectValue 
-} from "@/components/ui/select";
-import { geminiModels } from "@/services/geminiService";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Badge } from "@/components/ui/badge";
+import { Globe, Sparkles } from "lucide-react";
+import { allTranslationServices } from "@/services/translationServices";
+import { TranslationServiceType } from "@/types/subtitle";
 
 interface LanguageSelectorProps {
   selectedSourceLanguage: string;
   selectedTargetLanguage: string;
-  selectedModel: string;
+  selectedService: string;
   onSourceLanguageChange: (language: string) => void;
   onTargetLanguageChange: (language: string) => void;
-  onModelChange: (model: string) => void;
+  onServiceChange: (service: string) => void;
   onTranslate: () => void;
   isTranslating: boolean;
   disableTranslate: boolean;
@@ -46,14 +38,27 @@ const languages = [
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({
   selectedSourceLanguage,
   selectedTargetLanguage,
-  selectedModel,
+  selectedService,
   onSourceLanguageChange,
   onTargetLanguageChange,
-  onModelChange,
+  onServiceChange,
   onTranslate,
   isTranslating,
   disableTranslate,
 }) => {
+  // Get service provider type (gemini or deepl)
+  const selectedServiceInfo = allTranslationServices.find(s => s.id === selectedService);
+  const serviceProvider: TranslationServiceType = selectedServiceInfo?.provider || "gemini";
+  
+  // Filter languages based on service provider
+  const filteredLanguages = languages.filter(lang => {
+    // DeepL doesn't support Arabic, Hindi, or Bengali
+    if (serviceProvider === "deepl") {
+      return !["ar", "hi", "bn"].includes(lang.value);
+    }
+    return true;
+  });
+
   return (
     <div className="flex flex-col space-y-6">
       <div className="space-y-4">
@@ -67,7 +72,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               <SelectValue placeholder="Pilih bahasa asal..." />
             </SelectTrigger>
             <SelectContent>
-              {languages.map((language) => (
+              {filteredLanguages.map((language) => (
                 <SelectItem key={language.value} value={language.value}>
                   {language.label}
                 </SelectItem>
@@ -86,7 +91,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
               <SelectValue placeholder="Pilih bahasa tujuan..." />
             </SelectTrigger>
             <SelectContent>
-              {languages.map((language) => (
+              {filteredLanguages.map((language) => (
                 <SelectItem key={language.value} value={language.value}>
                   {language.label}
                 </SelectItem>
@@ -98,19 +103,19 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({
         <div>
           <label className="text-sm font-medium mb-2 flex items-center gap-1">
             <Sparkles size={16} className="text-yellow-500" />
-            <span>Model AI</span>
+            <span>Layanan Terjemahan</span>
           </label>
           <Select 
-            value={selectedModel} 
-            onValueChange={onModelChange}
+            value={selectedService} 
+            onValueChange={onServiceChange}
           >
             <SelectTrigger className="w-full">
-              <SelectValue placeholder="Pilih model AI..." />
+              <SelectValue placeholder="Pilih layanan terjemahan..." />
             </SelectTrigger>
             <SelectContent className="max-h-[300px]">
-              {geminiModels.map((model) => (
-                <SelectItem key={model.id} value={model.id} className="flex items-center justify-between pr-10">
-                  {model.name}
+              {allTranslationServices.map((service) => (
+                <SelectItem key={service.id} value={service.id} className="flex items-center justify-between pr-10">
+                  {service.name}
                 </SelectItem>
               ))}
             </SelectContent>

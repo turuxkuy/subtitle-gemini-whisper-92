@@ -4,7 +4,7 @@ import { SubtitleEntry } from "@/types/subtitle";
 // The Gemini API key
 const GEMINI_API_KEY = "AIzaSyA8YmwOrBK7Yg1E_NMg-_T2TZf7J9h8qOM";
 
-// Available models - removed the unwanted models
+// Available models
 export const geminiModels = [
   { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", description: "Cepat dan hemat", provider: "gemini" },
   { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Kualitas tinggi", provider: "gemini" },
@@ -61,7 +61,7 @@ export async function translateSubtitles(
       );
     }
     
-    // Use Gemini for translation - removed OpenRouter since it's been removed
+    // Use Gemini for translation
     return translateWithGemini(
       subtitles, 
       subtitleTexts, 
@@ -108,9 +108,8 @@ async function translateWithGemini(
   
   const apiUrl = "https://generativelanguage.googleapis.com/v1beta/models/" + modelId + ":generateContent";
   
-  // Enhanced prompt with clear instructions for high-quality translations
-  // Added instructions to maintain punctuation properly
-  const prompt = `Translate the following subtitles from ${sourceLangName} to ${targetLangName}.
+  // Enhanced prompt with clear instructions and numbered subtitles for better mapping
+  const prompt = `Translate the following numbered subtitles from ${sourceLangName} to ${targetLangName}.
 Your translation MUST:
 1. Maintain the original meaning and context
 2. Use natural expressions in ${targetLangName}
@@ -118,17 +117,16 @@ Your translation MUST:
 4. Preserve ALL formatting and emotion
 5. Be concise and clear
 6. Maintain ALL punctuation marks (!, ?, ., ,) in the translated text
-7. Translate ALL subtitles completely without omissions
-8. Ensure the last subtitle is fully translated just like the others
+7. Always include the subtitle number before each translation (e.g., "1:", "2:", etc.)
+8. Translate ALL subtitles completely without omissions
 
-Return ONLY the translated text for each subtitle, in the same order:
+IMPORTANT: Keep the same NUMBER OF SUBTITLES and maintain the EXACT SAME NUMBERING sequence!
 
-${subtitleTexts.join('\n\n')}`;
+Here are the subtitles to translate:
 
-  console.log("Sending request to Gemini API with prompt:", prompt);
-  console.log("Source language:", sourceLangName);
-  console.log("Target language:", targetLangName);
-  console.log("Selected model:", modelId);
+${subtitleTexts.map((text, index) => `${index + 1}: ${text}`).join('\n\n')}`;
+
+  console.log("Sending request to Gemini API");
   console.log("Number of subtitles:", subtitles.length);
 
   // Make request to Gemini API
@@ -142,10 +140,10 @@ ${subtitleTexts.join('\n\n')}`;
         parts: [{ text: prompt }]
       }],
       generationConfig: {
-        temperature: 0.2,
+        temperature: 0.1,  // Lower temperature for more consistent results
         topP: 0.8,
         topK: 40,
-        maxOutputTokens: 8192 // Ensure there's enough token space for all translations
+        maxOutputTokens: 8192
       }
     })
   });
@@ -157,7 +155,6 @@ ${subtitleTexts.join('\n\n')}`;
   }
 
   const data = await response.json();
-  console.log("Gemini API response:", data);
   
   if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0].text) {
     console.error("Unexpected Gemini API response structure:", data);
@@ -167,42 +164,35 @@ ${subtitleTexts.join('\n\n')}`;
   // Extract translated text from the response
   const translatedText = data.candidates[0].content.parts[0].text;
   
-  // Split the translated text by double newlines to get individual subtitles
-  const translatedSubtitles = translatedText.split(/\n\s*\n/);
+  // Process the translated text to extract numbered translations
+  // This regex looks for patterns like "1:", "2:", etc. followed by text
+  const translationRegex = /(\d+)\s*:\s*([\s\S]+?)(?=\n\s*\d+\s*:|$)/g;
+  const translationMatches = [...translatedText.matchAll(translationRegex)];
   
-  console.log("Translated subtitles count:", translatedSubtitles.length);
-  console.log("Original subtitles count:", subtitles.length);
+  console.log(`Extracted ${translationMatches.length} numbered translations`);
   
-  // If the counts don't match, ensure we handle all subtitles
-  let result: SubtitleEntry[] = [];
-
-  // Enhanced logic to ensure all subtitles get translated, even if response count doesn't match
-  if (translatedSubtitles.length >= subtitles.length) {
-    // We have enough translations, map them directly
-    result = subtitles.map((sub, index) => ({
-      ...sub,
-      text: translatedSubtitles[index].trim()
-    }));
-  } else {
-    // Handle case where we received fewer translations than expected
-    console.warn("Received fewer translations than expected, attempting to distribute translations");
-    
-    // Try to process what we have
-    result = subtitles.map((sub, index) => {
-      if (index < translatedSubtitles.length) {
-        return {
-          ...sub,
-          text: translatedSubtitles[index].trim()
-        };
-      } else {
-        // For missing translations, use fallback approach
-        return {
-          ...sub,
-          text: `[${targetLangName} translation missing] ${sub.text}`
-        };
-      }
-    });
+  // Create a map of subtitle number to translated text
+  const translationMap = new Map<number, string>();
+  for (const match of translationMatches) {
+    const number = parseInt(match[1]);
+    const text = match[2].trim();
+    translationMap.set(number, text);
   }
   
-  return result;
+  // Create translated subtitles with proper mapping
+  return subtitles.map((subtitle, index) => {
+    const number = index + 1; // 1-based indexing as in the prompt
+    const translatedText = translationMap.get(number);
+    
+    if (translatedText) {
+      return {
+        ...subtitle,
+        text: translatedText
+      };
+    }
+    
+    // Fallback if no translation found for this number
+    console.warn(`No translation found for subtitle ${number}, using original`);
+    return subtitle;
+  });
 }
