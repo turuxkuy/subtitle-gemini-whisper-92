@@ -24,7 +24,6 @@ const languageCodeMapping: Record<string, string> = {
   // "bn": "BN", // Bengali
 };
 
-// Direct implementation without proxy
 export async function translateWithDeepL(
   subtitles: SubtitleEntry[],
   sourceLanguage: string,
@@ -42,39 +41,38 @@ export async function translateWithDeepL(
     // Prepare texts for translation
     const textsToTranslate = subtitles.map(sub => sub.text);
     
+    // API request to DeepL
     console.log(`Translating ${textsToTranslate.length} subtitles with DeepL from ${sourceLang} to ${targetLang}`);
-
-    // Use the official DeepL API directly with external API service
-    // This approach completely bypasses CORS by using a backend service
-    const apiEndpoint = "https://api.deepl-translator.workers.dev";
+    console.log('DeepL API URL:', DEEPL_API_URL);
     
-    // Log that we're using the external service
-    console.log("Using external DeepL translation service at:", apiEndpoint);
-    
-    const response = await fetch(apiEndpoint, {
+    // Add proper CORS handling
+    const response = await fetch(DEEPL_API_URL, {
       method: "POST",
       headers: {
+        "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         text: textsToTranslate,
-        source_language: sourceLang,
-        target_language: targetLang,
-        auth_key: DEEPL_API_KEY
+        source_lang: sourceLang,
+        target_lang: targetLang,
       }),
+      // Adding mode: 'cors' explicitly
+      mode: 'cors',
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
-      console.error("External translation service error:", errorText);
-      throw new Error(`External translation service error: ${response.status}`);
+      console.error(`DeepL API response status: ${response.status}`);
+      console.error(`DeepL API error details:`, errorText);
+      throw new Error(`DeepL API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     
     if (!data.translations || !Array.isArray(data.translations)) {
       console.error("Unexpected DeepL API response format:", data);
-      throw new Error("Format respons API DeepL tidak sesuai yang diharapkan");
+      throw new Error("Unexpected DeepL API response format");
     }
     
     console.log(`Received ${data.translations.length} translations from DeepL`);
@@ -91,14 +89,6 @@ export async function translateWithDeepL(
     });
   } catch (error) {
     console.error("DeepL translation error:", error);
-    
-    // Provide more helpful error message
-    if (error instanceof Error) {
-      if (error.message.includes("External translation service error")) {
-        throw new Error("Layanan penerjemahan DeepL sedang bermasalah. Silahkan coba lagi nanti atau gunakan layanan Gemini sebagai alternatif.");
-      }
-    }
-    
     throw error;
   }
 }
