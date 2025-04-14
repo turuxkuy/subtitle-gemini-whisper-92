@@ -43,7 +43,9 @@ export async function translateWithDeepL(
     
     // API request to DeepL
     console.log(`Translating ${textsToTranslate.length} subtitles with DeepL from ${sourceLang} to ${targetLang}`);
+    console.log('DeepL API URL:', DEEPL_API_URL);
     
+    // Add proper CORS handling
     const response = await fetch(DEEPL_API_URL, {
       method: "POST",
       headers: {
@@ -54,18 +56,22 @@ export async function translateWithDeepL(
         text: textsToTranslate,
         source_lang: sourceLang,
         target_lang: targetLang,
-        preserve_formatting: true,
       }),
+      // Adding mode: 'cors' explicitly
+      mode: 'cors',
     });
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`DeepL API response status: ${response.status}`);
+      console.error(`DeepL API error details:`, errorText);
       throw new Error(`DeepL API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
     
     if (!data.translations || !Array.isArray(data.translations)) {
+      console.error("Unexpected DeepL API response format:", data);
       throw new Error("Unexpected DeepL API response format");
     }
     

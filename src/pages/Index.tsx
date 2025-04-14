@@ -70,7 +70,18 @@ const Index = () => {
       // Choose the appropriate translation service
       if (serviceInfo.provider === "deepl") {
         console.log(`Menerjemahkan dengan DeepL dari ${sourceLanguage} ke ${targetLanguage}`);
-        translated = await translateWithDeepL(originalSubtitles, sourceLanguage, targetLanguage);
+        
+        try {
+          translated = await translateWithDeepL(originalSubtitles, sourceLanguage, targetLanguage);
+        } catch (error) {
+          console.error("DeepL translation specific error:", error);
+          toast.error(`DeepL API Error: ${(error as Error).message}`);
+          // Show more detailed error for DeepL
+          if ((error as Error).message.includes("Failed to fetch") || (error as Error).message.includes("Network Error")) {
+            toast.error("Koneksi ke DeepL API gagal. Periksa koneksi internet atau coba gunakan layanan terjemahan lainnya.");
+          }
+          throw error;
+        }
       } else {
         console.log(`Menerjemahkan dengan Gemini dari ${sourceLanguage} ke ${targetLanguage} menggunakan model ${selectedService}`);
         translated = await translateSubtitles(originalSubtitles, sourceLanguage, targetLanguage, selectedService);
