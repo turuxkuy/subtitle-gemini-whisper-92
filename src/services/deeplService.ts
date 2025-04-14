@@ -1,4 +1,3 @@
-
 import { SubtitleEntry } from "@/types/subtitle";
 
 // DeepL API key - this is a publishable API key
@@ -42,14 +41,21 @@ export async function translateWithDeepL(
     // Prepare texts for translation
     const textsToTranslate = subtitles.map(sub => sub.text);
     
-    // API request to DeepL
     console.log(`Translating ${textsToTranslate.length} subtitles with DeepL from ${sourceLang} to ${targetLang}`);
-    console.log('DeepL API URL:', DEEPL_API_URL);
     
-    // Using the fetch API with a proxy workaround for CORS
-    // We'll try direct fetch first, then fall back to a CORS proxy if needed
-    let response;
+    // Try with multiple CORS proxies in case one fails
+    const corsProxies = [
+      "https://corsproxy.io/?",
+      "https://cors-anywhere.herokuapp.com/",
+      "https://api.allorigins.win/raw?url="
+    ];
+    
+    let response = null;
+    let lastError = null;
+    
+    // First try direct API call
     try {
+      console.log("Trying direct API call to DeepL...");
       response = await fetch(DEEPL_API_URL, {
         method: "POST",
         headers: {
@@ -61,39 +67,61 @@ export async function translateWithDeepL(
           source_lang: sourceLang,
           target_lang: targetLang,
         }),
-        mode: 'cors',
       });
-    } catch (fetchError) {
-      console.error("Initial fetch failed, trying with CORS proxy:", fetchError);
       
-      // Try with a CORS proxy as fallback
-      const corsProxyUrl = "https://corsproxy.io/?";
-      response = await fetch(corsProxyUrl + encodeURIComponent(DEEPL_API_URL), {
-        method: "POST",
-        headers: {
-          "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          text: textsToTranslate,
-          source_lang: sourceLang,
-          target_lang: targetLang,
-        }),
-      });
+      if (response.ok) {
+        console.log("Direct API call succeeded!");
+      } else {
+        throw new Error(`Status: ${response.status}`);
+      }
+    } catch (error) {
+      console.log("Direct API call failed:", error);
+      lastError = error;
+      
+      // Try each proxy in sequence
+      for (const proxy of corsProxies) {
+        try {
+          console.log(`Trying with CORS proxy: ${proxy}`);
+          const proxyUrl = proxy + encodeURIComponent(DEEPL_API_URL);
+          
+          response = await fetch(proxyUrl, {
+            method: "POST",
+            headers: {
+              "Authorization": `DeepL-Auth-Key ${DEEPL_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              text: textsToTranslate,
+              source_lang: sourceLang,
+              target_lang: targetLang,
+            }),
+          });
+          
+          if (response.ok) {
+            console.log(`Proxy ${proxy} worked!`);
+            break;
+          } else {
+            throw new Error(`Status: ${response.status}`);
+          }
+        } catch (proxyError) {
+          console.log(`Proxy ${proxy} failed:`, proxyError);
+          lastError = proxyError;
+          // Continue to next proxy
+        }
+      }
     }
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`DeepL API response status: ${response.status}`);
-      console.error(`DeepL API error details:`, errorText);
-      throw new Error(`DeepL API error: ${response.status} - ${errorText}`);
+    
+    // If all attempts failed
+    if (!response || !response.ok) {
+      console.error("All API attempts failed");
+      throw new Error("Semua upaya koneksi ke API DeepL gagal. Silakan coba lagi nanti atau gunakan layanan Gemini.");
     }
 
     const data = await response.json();
     
     if (!data.translations || !Array.isArray(data.translations)) {
       console.error("Unexpected DeepL API response format:", data);
-      throw new Error("Unexpected DeepL API response format");
+      throw new Error("Format respons API DeepL tidak sesuai yang diharapkan");
     }
     
     console.log(`Received ${data.translations.length} translations from DeepL`);

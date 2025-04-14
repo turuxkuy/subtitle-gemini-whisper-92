@@ -57,6 +57,7 @@ const Index = () => {
     }
 
     setIsTranslating(true);
+    toast.info("Memulai proses terjemahan...");
 
     try {
       // Get the service provider type
@@ -69,20 +70,26 @@ const Index = () => {
       
       // Choose the appropriate translation service
       if (serviceInfo.provider === "deepl") {
+        toast.info(`Menerjemahkan dengan DeepL dari ${sourceLanguage} ke ${targetLanguage}...`);
         console.log(`Menerjemahkan dengan DeepL dari ${sourceLanguage} ke ${targetLanguage}`);
         
         try {
           translated = await translateWithDeepL(originalSubtitles, sourceLanguage, targetLanguage);
         } catch (error) {
           console.error("DeepL translation specific error:", error);
-          toast.error(`DeepL API Error: ${(error as Error).message}`);
+          
           // Show more detailed error for DeepL
-          if ((error as Error).message.includes("Failed to fetch") || (error as Error).message.includes("Network Error")) {
-            toast.error("Koneksi ke DeepL API gagal. Periksa koneksi internet atau coba gunakan layanan terjemahan lainnya.");
+          if ((error as Error).message.includes("Failed to fetch") || 
+              (error as Error).message.includes("Network Error") ||
+              (error as Error).message.includes("CORS")) {
+            toast.error("Koneksi ke DeepL API gagal karena masalah CORS. Coba gunakan layanan terjemahan Gemini sebagai alternatif.");
+          } else {
+            toast.error(`DeepL API Error: ${(error as Error).message}`);
           }
           throw error;
         }
       } else {
+        toast.info(`Menerjemahkan dengan Gemini dari ${sourceLanguage} ke ${targetLanguage}...`);
         console.log(`Menerjemahkan dengan Gemini dari ${sourceLanguage} ke ${targetLanguage} menggunakan model ${selectedService}`);
         translated = await translateSubtitles(originalSubtitles, sourceLanguage, targetLanguage, selectedService);
       }
