@@ -1,13 +1,13 @@
 
-import { SubtitleEntry } from "@/types/subtitle";
+import { SubtitleEntry, TranslationServiceType } from "@/types/subtitle";
 
 // The Gemini API key
 const GEMINI_API_KEY = "AIzaSyA8YmwOrBK7Yg1E_NMg-_T2TZf7J9h8qOM";
 
 // Available models
 export const geminiModels = [
-  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", description: "Cepat dan hemat", provider: "gemini" },
-  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Kualitas tinggi", provider: "gemini" },
+  { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash", description: "Cepat dan hemat", provider: "gemini" as TranslationServiceType },
+  { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro", description: "Kualitas tinggi", provider: "gemini" as TranslationServiceType },
 ];
 
 export async function translateSubtitles(
